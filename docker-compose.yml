@@ -1,0 +1,60 @@
+services:
+  db:
+    image: mysql:8.0
+    container_name: voting-db
+    restart: always
+    environment:
+      MYSQL_DATABASE: voting
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3307:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - voting-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.backend
+    container_name: voting-backend
+    restart: always
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/voting
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8083:8080"
+    networks:
+      - voting-net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.frontend
+      args:
+        REACT_APP_API_URL: http://backend:8080/api
+    container_name: voting-frontend
+    restart: always
+    ports:
+      - "8082:8080"
+    depends_on:
+      - backend
+    networks:
+      - voting-net
+
+volumes:
+  db_data:
+
+networks:
+  voting-net:
+    driver: bridge
